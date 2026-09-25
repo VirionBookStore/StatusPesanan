@@ -9,9 +9,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
@@ -19,22 +17,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Pastikan layout berada di dalam area system windows (di bawah status bar)
         WindowCompat.setDecorFitsSystemWindows(window, true)
+        
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
-
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(
-                view.paddingLeft,
-                systemBars.top,
-                view.paddingRight,
-                systemBars.bottom
-            )
-            insets
-        }
-        ViewCompat.requestApplyInsets(webView)
 
         webView.settings.apply {
             javaScriptEnabled = true
