@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
             cacheMode = WebSettings.LOAD_DEFAULT
             allowFileAccess = false
             allowContentAccess = true
-            userAgentString = "$userAgent StatusPesananAPK"
+            userAgentString = "${userAgentString} StatusPesananAPK"
         }
 
         webView.webViewClient = object : WebViewClient() {
