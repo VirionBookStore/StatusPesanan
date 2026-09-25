@@ -281,11 +281,15 @@
       if (statusStr === 'STOCK SYSTEM') return "bg-slate-100 text-slate-700 border-slate-300"; 
       if (statusStr === 'READY') return "bg-blue-100 text-blue-700 border-blue-300"; 
       if (statusStr === 'KIRIM') return "bg-orange-100 text-orange-700 border-orange-300"; 
-      if (statusStr === 'SAMPAI') return "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300"; 
+      
+      // Mengubah warna SAMPAI menjadi Hijau (green-100 & green-700)
+      if (statusStr === 'SAMPAI') return "bg-green-100 text-green-700 border-green-300"; 
+      
       if (statusStr === 'SELESAI') return "bg-emerald-100 text-emerald-700 border-emerald-300"; 
-      if (statusStr === 'BATAL') return "bg-rose-100 text-rose-700 border-rose-300"; 
-      if (statusStr === 'KOSONG') return "bg-purple-100 text-purple-700 border-purple-300"; 
+      if (statusStr === 'BATAL') return "bg-slate-100 text-slate-700 border-slate-300"; 
+      if (statusStr === 'KOSONG') return "bg-slate-100 text-slate-700 border-slate-300"; 
       return "bg-gray-100 text-gray-700 border-gray-300"; 
+    }
     }
 
     // PERUBAHAN STATUS INSTAN (OPTIMISTIC UI) & LATAR BELAKANG SYNC
