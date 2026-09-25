@@ -1,8 +1,6 @@
 package com.virion.statuspesanan
 
-import android.app.Activity
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -11,7 +9,9 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
@@ -23,6 +23,19 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
+
+        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                view.paddingLeft,
+                systemBars.top,
+                view.paddingRight,
+                systemBars.bottom
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(webView)
+
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -59,8 +72,6 @@ class MainActivity : ComponentActivity() {
                     "Tekan kembali sekali lagi untuk keluar",
                     Toast.LENGTH_SHORT
                 ).show()
-                webView.postDelayed({ }, 1500)
-                // Android akan tetap berada di halaman utama; tekan Home untuk keluar.
             }
         }
     }
