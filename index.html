@@ -32,7 +32,6 @@
         </div>
         <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition shadow-md text-sm">Masuk</button>
       </form>
-      
       <div id="alertBox" class="mt-4 hidden p-3 rounded-xl text-sm text-center"></div>
     </div>
   </div>
@@ -63,17 +62,16 @@
             <h2 class="font-bold text-sm text-gray-800 uppercase shrink-0">RINCIAN PESANAN</h2>
             
             <div class="flex w-full sm:w-auto items-center gap-2">
-                <select id="filterPemesan" onchange="loadRiwayatPesanan()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-grow sm:w-48 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <select id="filterPemesan" onchange="onFilterChange()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-grow sm:w-48 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="semua">Memuat...</option>
                 </select>
                 
-                <!-- TOMBOL EXPORT EXCEL BARU -->
                 <button onclick="exportToExcel()" class="border border-emerald-300 rounded-lg px-3 py-1.5 bg-emerald-50 text-xs text-emerald-700 flex items-center gap-1 hover:bg-emerald-100 transition shrink-0 font-medium">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Excel
                 </button>
 
-                <button onclick="loadRiwayatPesanan()" class="border border-gray-300 rounded-lg px-3 py-1.5 bg-gray-50 text-xs text-gray-700 flex items-center gap-1 hover:bg-gray-100 transition shrink-0">
+                <button onclick="loadRiwayatPesanan(true)" class="border border-gray-300 rounded-lg px-3 py-1.5 bg-gray-50 text-xs text-gray-700 flex items-center gap-1 hover:bg-gray-100 transition shrink-0">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     Refresh
                 </button>
@@ -108,28 +106,21 @@
   </div>
 
   <script>
-    // =================================================================
-    // PASTE URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA DI SINI
-    // =================================================================
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwMvlVWDa-enbZ7P2AABnszlTTOhSXSJ_sXSiaoczwJlJ554vLVUKATm4wBs5QuYoU4vQ/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwMvlVWDa-enbZ7P2AABnszlTTOhSXSJ_sSsiaoczwJlJ554vLVUKATm4wBs5QuYoU4vQ/exec";
 
     let currentUserRole = '';
     let currentIdAkses = '';
-    let currentPesananData = []; // Menyimpan data untuk diexport
+    let currentPesananData = []; 
 
-    // Fungsi Fetch API menggantikan google.script.run
     async function callGasApi(action, payload = {}) {
-      if (!GAS_URL || GAS_URL === "") {
-        return { status: 'error', message: 'Variabel GAS_URL belum diatur di dalam kode index.html!' };
-      }
+      if (!GAS_URL) return { status: 'error', message: 'GAS_URL belum diatur!' };
       try {
         const response = await fetch(GAS_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ action: action, payload: payload })
         });
-        const result = await response.json();
-        return result;
+        return await response.json();
       } catch (err) {
         return { status: 'error', message: err.toString() };
       }
@@ -187,23 +178,53 @@
     }
 
     function loadDaftarPemesan() {
-      const select = document.getElementById('filterPemesan');
+      const cachedPemesan = localStorage.getItem('cache_pemesan_' + currentUserRole);
+      if (cachedPemesan) {
+        try { renderPemesanOptions(JSON.parse(cachedPemesan)); } catch(e) {}
+      }
+
       callGasApi('getPemesan', { role: currentUserRole, id_akses: currentIdAkses }).then(res => {
         if (res.status === 'success' && res.data.length > 0) {
-          let options = `<option value="semua">Semua Pemesan</option>`;
-          res.data.forEach(nama => { options += `<option value="${nama}">${nama}</option>`; });
-          select.innerHTML = options;
-        } else {
-          select.innerHTML = `<option value="semua">Belum ada pemesan</option>`;
+          localStorage.setItem('cache_pemesan_' + currentUserRole, JSON.stringify(res.data));
+          renderPemesanOptions(res.data);
         }
-        loadRiwayatPesanan(); 
       });
     }
 
-    function loadRiwayatPesanan() {
+    function renderPemesanOptions(data) {
+      const select = document.getElementById('filterPemesan');
+      const currentSelected = select.value;
+      let options = `<option value="semua">Semua Pemesan</option>`;
+      data.forEach(nama => { options += `<option value="${nama}">${nama}</option>`; });
+      select.innerHTML = options;
+      if (currentSelected && currentSelected !== "semua") {
+        select.value = currentSelected;
+      }
+      loadRiwayatPesanan(false);
+    }
+
+    function onFilterChange() {
+      loadRiwayatPesanan(false);
+    }
+
+    function loadRiwayatPesanan(forceRefresh = false) {
       const container = document.getElementById('listPesananContainer');
       const filter = document.getElementById('filterPemesan').value;
-      container.innerHTML = `<div class="text-center text-slate-400 text-xs py-3">Menarik data dari Google Sheet...</div>`;
+      const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_${filter}`;
+
+      if (!forceRefresh) {
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) {
+          try {
+            currentPesananData = JSON.parse(cachedData);
+            renderPesanan(currentPesananData);
+          } catch(e) {}
+        } else {
+          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-3">Menarik data dari Google Sheet...</div>`;
+        }
+      } else {
+        container.innerHTML = `<div class="text-center text-slate-400 text-xs py-3">Memperbarui data...</div>`;
+      }
 
       callGasApi('getPesanan', { 
           namaPemesan: filter,
@@ -211,15 +232,15 @@
           id_akses: currentIdAkses
       }).then(res => {
         if (res.status === 'success') {
-            currentPesananData = res.data; // Simpan untuk Excel
+            currentPesananData = res.data; 
+            localStorage.setItem(cacheKey, JSON.stringify(res.data));
             renderPesanan(res.data);
-        } else container.innerHTML = `<div class="text-center text-rose-500 text-xs py-3">Gagal memuat data.</div>`;
+        } else if (!localStorage.getItem(cacheKey)) {
+            container.innerHTML = `<div class="text-center text-rose-500 text-xs py-3">Gagal memuat data.</div>`;
+        }
       });
     }
 
-    // ==========================================
-    // FUNGSI EXPORT KE EXCEL
-    // ==========================================
     function exportToExcel() {
         if (!currentPesananData || currentPesananData.length === 0) {
             alert("Tidak ada data untuk di-export!");
@@ -227,8 +248,6 @@
         }
         
         let isUser = currentUserRole.toLowerCase() === 'user';
-        
-        // Membentuk array data sesuai role
         let exportData = currentPesananData.map((item, index) => {
             let rowData = {
                 "No": index + 1,
@@ -236,24 +255,16 @@
                 "Judul Buku": item.judul,
                 "Harga (Rp)": item.harga,
             };
-            
-            // User biasa tidak boleh melihat Diskon, Brutto, Netto
-            if (!isUser) {
-                rowData["Diskon (%)"] = item.disc;
-            }
-            
+            if (!isUser) rowData["Diskon (%)"] = item.disc;
             rowData["Qty"] = item.qty;
-            
             if (!isUser) {
                 rowData["Total Brutto (Rp)"] = item.brutto;
                 rowData["Total Netto (Rp)"] = item.netto;
             }
-            
             rowData["Status"] = item.status;
             return rowData;
         });
 
-        // Konversi ke Excel menggunakan SheetJS
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Data Pesanan");
@@ -262,7 +273,6 @@
         const pemesanName = filterValue === 'semua' ? 'SemuaPemesan' : filterValue;
         const dateStr = new Date().toISOString().slice(0, 10);
         
-        // Unduh File
         XLSX.writeFile(wb, `Report_Pesanan_${pemesanName}_${dateStr}.xlsx`);
     }
 
@@ -278,22 +288,27 @@
       return "bg-gray-100 text-gray-700 border-gray-300"; 
     }
 
+    // PERUBAHAN STATUS INSTAN (OPTIMISTIC UI) & LATAR BELAKANG SYNC
     function changeStatus(selectElem, pemesan, rowIndex) {
       const newStatus = selectElem.value;
-      selectElem.disabled = true;
-      selectElem.classList.add('opacity-50', 'cursor-wait');
+      
+      let newClass = getStatusColor(newStatus);
+      selectElem.className = newClass + " text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-1 border rounded uppercase tracking-tighter outline-none cursor-pointer text-center w-full min-w-[75px] md:min-w-[95px]";
+
+      const itemIndex = currentPesananData.findIndex(item => item.sheetPemesan === pemesan && item.rowIndex === rowIndex);
+      if (itemIndex !== -1) {
+        currentPesananData[itemIndex].status = newStatus;
+        const filter = document.getElementById('filterPemesan').value;
+        const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_${filter}`;
+        localStorage.setItem(cacheKey, JSON.stringify(currentPesananData));
+        renderPesanan(currentPesananData);
+      }
 
       callGasApi('updateStatus', { namaPemesan: pemesan, rowIndex: rowIndex, newStatus: newStatus })
       .then(res => {
-        selectElem.disabled = false;
-        selectElem.classList.remove('opacity-50', 'cursor-wait');
-        if (res.status === 'success') {
-          let newClass = getStatusColor(newStatus);
-          selectElem.className = newClass + " text-[9px] md:text-[10px] font-bold px-0.5 md:px-1 py-1 border rounded uppercase tracking-tighter outline-none cursor-pointer text-center w-full max-w-[70px] md:max-w-[90px]";
-          loadRiwayatPesanan();
-        } else {
-          alert("Gagal menyimpan status: " + res.message);
-          loadRiwayatPesanan(); 
+        if (res.status !== 'success') {
+          alert("Gagal menyinkronkan status ke server: " + res.message);
+          loadRiwayatPesanan(true); 
         }
       });
     }
@@ -364,7 +379,7 @@
                       ${!isUser ? `<td class="p-3 text-right font-bold text-blue-600">${fmt(item.netto)}</td>` : ''}
                       <td class="p-3 text-center">
                           ${isOwner ? `
-                          <select onchange="changeStatus(this, '${item.sheetPemesan}', ${item.rowIndex})" class="${bgStatus} text-[10px] font-bold px-1 py-1 border rounded-md uppercase tracking-wider outline-none cursor-pointer text-center w-full max-w-[90px]">
+                          <select onchange="changeStatus(this, '${item.sheetPemesan}', ${item.rowIndex})" class="${bgStatus} text-[10px] font-bold px-2 py-1 border rounded-md uppercase tracking-wider outline-none cursor-pointer text-center min-w-[95px]">
                               <option value="Stock System" ${item.status.toUpperCase() === 'STOCK SYSTEM' ? 'selected' : ''}>Stock System</option>
                               <option value="Ready" ${item.status.toUpperCase() === 'READY' ? 'selected' : ''}>Ready</option>
                               <option value="Kirim" ${item.status.toUpperCase() === 'KIRIM' ? 'selected' : ''}>Kirim</option>
@@ -374,7 +389,7 @@
                               <option value="Kosong" ${item.status.toUpperCase() === 'KOSONG' ? 'selected' : ''}>Kosong</option>
                           </select>
                           ` : `
-                          <span class="${bgStatus} text-[10px] font-bold px-2 py-1 border rounded-md uppercase tracking-wider inline-block min-w-[80px]">
+                          <span class="${bgStatus} text-[10px] font-bold px-2 py-1 border rounded-md uppercase tracking-wider inline-block min-w-[85px]">
                               ${item.status}
                           </span>
                           `}
@@ -383,14 +398,13 @@
       });
       html += `</tbody></table></div>`;
 
-
-      // TABEL MOBILE
+      // TABEL MOBILE (Diperlebar dan disesuaikan agar teks status tidak terpotong)
       html += `
       <div class="block md:hidden border-t border-b sm:border border-gray-200 sm:rounded-xl shadow-sm -mx-2 sm:mx-0 overflow-hidden bg-white">
           <table class="w-full text-left text-[10px] sm:text-xs">
               <thead class="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider text-[8px] sm:text-[9px]">
                   <tr>
-                      <th class="p-1.5 sm:p-2 font-bold w-[45%]">Judul</th>
+                      <th class="p-1.5 sm:p-2 font-bold w-[40%]">Judul</th>
                       <th class="p-1.5 sm:p-2 font-bold text-right leading-tight">Harga${!isUser ? '<br>Disc' : ''}</th>
                       ${!isUser ? `<th class="p-1.5 sm:p-2 font-bold text-right leading-tight">Brutto<br>Netto</th>` : ''}
                       <th class="p-1.5 sm:p-2 font-bold text-center leading-tight">Status<br>Qty</th>
@@ -418,7 +432,7 @@
                       <td class="p-1 sm:p-2 text-center align-middle whitespace-nowrap">
                           <div class="flex flex-col items-center justify-center gap-1">
                               ${isOwner ? `
-                              <select onchange="changeStatus(this, '${item.sheetPemesan}', ${item.rowIndex})" class="${bgStatus} text-[9px] font-bold px-0.5 py-1 border rounded uppercase tracking-tighter outline-none cursor-pointer text-center w-full max-w-[65px] truncate">
+                              <select onchange="changeStatus(this, '${item.sheetPemesan}', ${item.rowIndex})" class="${bgStatus} text-[9px] font-bold px-1.5 py-1 border rounded uppercase tracking-tighter outline-none cursor-pointer text-center w-full min-w-[75px]">
                                   <option value="Stock System" ${item.status.toUpperCase() === 'STOCK SYSTEM' ? 'selected' : ''}>Stock System</option>
                                   <option value="Ready" ${item.status.toUpperCase() === 'READY' ? 'selected' : ''}>Ready</option>
                                   <option value="Kirim" ${item.status.toUpperCase() === 'KIRIM' ? 'selected' : ''}>Kirim</option>
@@ -428,7 +442,7 @@
                                   <option value="Kosong" ${item.status.toUpperCase() === 'KOSONG' ? 'selected' : ''}>Kosong</option>
                               </select>
                               ` : `
-                              <span class="${bgStatus} text-[9px] font-bold px-1 py-1 border rounded uppercase tracking-tighter inline-block min-w-[55px] text-center truncate">
+                              <span class="${bgStatus} text-[9px] font-bold px-1.5 py-1 border rounded uppercase tracking-tighter inline-block min-w-[65px] text-center">
                                   ${item.status}
                               </span>
                               `}
