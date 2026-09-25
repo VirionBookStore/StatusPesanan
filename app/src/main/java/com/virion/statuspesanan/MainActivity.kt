@@ -9,21 +9,36 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val appUrl = "https://virionbookstore.github.io/StatusPesanan/"
+    
+    // Variabel untuk melacak waktu klik tombol kembali
+    private var backPressedTime: Long = 0 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Pastikan layout berada di dalam area system windows (di bawah status bar)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
-        
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
+
+        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                view.paddingLeft,
+                systemBars.top,
+                view.paddingRight,
+                systemBars.bottom
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(webView)
 
         webView.settings.apply {
             javaScriptEnabled = true
@@ -52,15 +67,22 @@ class MainActivity : ComponentActivity() {
 
         webView.loadUrl(appUrl)
 
+        // Logika tombol kembali
         onBackPressedDispatcher.addCallback(this) {
             if (webView.canGoBack()) {
-                webView.goBack()
+                webView.goBack() // Kembali ke halaman web sebelumnya jika ada
             } else {
-                Toast.makeText(
-                    this@MainActivity,
-                    "Tekan kembali sekali lagi untuk keluar",
-                    Toast.LENGTH_SHORT
-                ).show()
+                // Jika ditekan 2 kali dalam jeda 2 detik, aplikasi tertutup
+                if (backPressedTime + 2000 > System.currentTimeMillis()) {
+                    finish() 
+                } else {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Tekan kembali sekali lagi untuk keluar",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                backPressedTime = System.currentTimeMillis()
             }
         }
     }
