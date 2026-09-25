@@ -62,7 +62,8 @@
             <h2 class="font-bold text-sm text-gray-800 uppercase shrink-0">RINCIAN PESANAN</h2>
             
             <div class="flex w-full sm:w-auto items-center gap-2">
-                <select id="filterPemesan" onchange="onFilterChange()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-grow sm:w-48 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <!-- Dropdown Filter sekarang memicu filter lokal (instan) -->
+                <select id="filterPemesan" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-grow sm:w-48 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="semua">Memuat...</option>
                 </select>
                 
@@ -73,7 +74,7 @@
 
                 <button onclick="loadRiwayatPesanan(true)" class="border border-gray-300 rounded-lg px-3 py-1.5 bg-gray-50 text-xs text-gray-700 flex items-center gap-1 hover:bg-gray-100 transition shrink-0">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    Refresh
+                    Sync
                 </button>
             </div>
         </div>
@@ -105,15 +106,24 @@
     </div>
   </div>
 
+  <!-- GLOBAL SCRIPT -->
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzUnYThvsYM0sW7iTSHf5UeQ41eDvlPiW0Hw-y7p9IXvKrFsUWTX9FGw1AsjYUGGbE9bg/exec";
+    // ==============================================================================
+    // GANTI LINK DI BAWAH DENGAN URL GOOGLE APPS SCRIPT ANDA YANG BARU DI-DEPLOY
+    // ==============================================================================
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwqPH5JIJY9qloegHtJJcj5eSWIRe9_JyutWavFC_selrhRZcyHWI6ZAXEARc1DbH_afw/exec";
 
     let currentUserRole = '';
     let currentIdAkses = '';
-    let currentPesananData = []; 
+    
+    // Variabel Global untuk menyimpan data (Single Fetch API)
+    let globalPesananData = []; 
+    let currentFilteredData = [];
 
     async function callGasApi(action, payload = {}) {
-      if (!GAS_URL) return { status: 'error', message: 'GAS_URL belum diatur!' };
+      if (GAS_URL === "URL_WEB_APP_GAS_ANDA_DISINI" || !GAS_URL) {
+          return { status: 'error', message: 'GAS_URL belum diatur di file HTML!' };
+      }
       try {
         const response = await fetch(GAS_URL, {
           method: 'POST',
@@ -133,6 +143,7 @@
       const savedUser = localStorage.getItem('so_user_nama');
       const savedRole = localStorage.getItem('so_user_role');
       const savedIdAkses = localStorage.getItem('so_user_id_akses');
+      
       if (savedUser && savedRole) masukDashboard(savedUser, savedRole, savedIdAkses);
     };
 
@@ -197,58 +208,82 @@
       let options = `<option value="semua">Semua Pemesan</option>`;
       data.forEach(nama => { options += `<option value="${nama}">${nama}</option>`; });
       select.innerHTML = options;
+      
       if (currentSelected && currentSelected !== "semua") {
         select.value = currentSelected;
       }
+      
+      // Setelah filter jadi, tarik data pesanan UTAMA (Single Fetch)
       loadRiwayatPesanan(false);
     }
 
-    function onFilterChange() {
-      loadRiwayatPesanan(false);
+    // =========================================================================
+    // METODE CLIENT-SIDE FILTERING & OPTIMISTIC UI
+    // =========================================================================
+    
+    // Fungsi ini dipanggil dari Dropdown HTML "onchange" (Sangat cepat tanpa loading server)
+    function filterDanRenderLokal() {
+        const filterNama = document.getElementById('filterPemesan').value;
+        
+        if (filterNama === "semua") {
+            currentFilteredData = globalPesananData;
+        } else {
+            currentFilteredData = globalPesananData.filter(item => item.sheetPemesan === filterNama);
+        }
+        
+        renderPesanan(currentFilteredData);
     }
 
+    // Mengambil data SEMUA pesanan sekali saja dari server (Single Fetch Pattern)
     function loadRiwayatPesanan(forceRefresh = false) {
       const container = document.getElementById('listPesananContainer');
-      const filter = document.getElementById('filterPemesan').value;
-      const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_${filter}`;
+      const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_master`;
 
+      // Jika tidak force refresh dan data sudah ada di RAM lokal
+      if (!forceRefresh && globalPesananData.length > 0) {
+        filterDanRenderLokal();
+        return;
+      }
+
+      // Coba load dari localStorage HP (Cache)
       if (!forceRefresh) {
         const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
           try {
-            currentPesananData = JSON.parse(cachedData);
-            renderPesanan(currentPesananData);
+            globalPesananData = JSON.parse(cachedData);
+            filterDanRenderLokal();
           } catch(e) {}
         } else {
-          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-3">Menarik data dari Google Sheet...</div>`;
+          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-spinner fa-spin text-xl text-blue-500 mb-2"></i><br>Menarik data master dari server...</div>`;
         }
       } else {
-        container.innerHTML = `<div class="text-center text-slate-400 text-xs py-3">Memperbarui data...</div>`;
+        container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-arrows-rotate fa-spin text-xl text-blue-500 mb-2"></i><br>Menyinkronkan data dengan server...</div>`;
       }
 
+      // Tarik Data (Selalu parameter "semua" agar filter client-side jalan)
       callGasApi('getPesanan', { 
-          namaPemesan: filter,
+          namaPemesan: "semua", 
           role: currentUserRole,
           id_akses: currentIdAkses
       }).then(res => {
         if (res.status === 'success') {
-            currentPesananData = res.data; 
+            globalPesananData = res.data; 
             localStorage.setItem(cacheKey, JSON.stringify(res.data));
-            renderPesanan(res.data);
+            filterDanRenderLokal();
         } else if (!localStorage.getItem(cacheKey)) {
-            container.innerHTML = `<div class="text-center text-rose-500 text-xs py-3">Gagal memuat data.</div>`;
+            container.innerHTML = `<div class="text-center text-rose-500 text-xs py-3">Gagal memuat data dari server.</div>`;
         }
       });
     }
 
     function exportToExcel() {
-        if (!currentPesananData || currentPesananData.length === 0) {
+        if (!currentFilteredData || currentFilteredData.length === 0) {
             alert("Tidak ada data untuk di-export!");
             return;
         }
         
         let isUser = currentUserRole.toLowerCase() === 'user';
-        let exportData = currentPesananData.map((item, index) => {
+        let exportData = currentFilteredData.map((item, index) => {
             let rowData = {
                 "No": index + 1,
                 "Nama Pemesan": item.sheetPemesan,
@@ -288,29 +323,42 @@
       return "bg-gray-100 text-gray-700 border-gray-300"; 
     }
 
-    // PERUBAHAN STATUS INSTAN (OPTIMISTIC UI) & LATAR BELAKANG SYNC
+    // PERUBAHAN STATUS INSTAN (OPTIMISTIC UI) - Mencegah Lag di Layar HP
     function changeStatus(selectElem, pemesan, rowIndex) {
       const newStatus = selectElem.value;
       
+      // 1. UPDATE VISUAL LANGSUNG (Tanpa merusak DOM / Re-render tabel)
       let newClass = getStatusColor(newStatus);
       selectElem.className = newClass + " text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-1 border rounded uppercase tracking-tighter outline-none cursor-pointer text-center w-full min-w-[75px] md:min-w-[95px]";
 
-      const itemIndex = currentPesananData.findIndex(item => item.sheetPemesan === pemesan && item.rowIndex === rowIndex);
+      // 2. UPDATE VARIABEL MEMORI (RAM)
+      const itemIndex = globalPesananData.findIndex(item => item.sheetPemesan === pemesan && item.rowIndex === rowIndex);
       if (itemIndex !== -1) {
-        currentPesananData[itemIndex].status = newStatus;
-        const filter = document.getElementById('filterPemesan').value;
-        const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_${filter}`;
-        localStorage.setItem(cacheKey, JSON.stringify(currentPesananData));
-        renderPesanan(currentPesananData);
+        globalPesananData[itemIndex].status = newStatus;
+        
+        // Simpan perubahannya di Cache HP
+        const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_master`;
+        localStorage.setItem(cacheKey, JSON.stringify(globalPesananData));
+        
+        // Update data filter yang saat ini aktif (Agar nilai kalkulasi summary ikut berubah di memori)
+        filterDanRenderLokalTunda();
       }
 
+      // 3. SYNC KE SERVER BACKGROUND
       callGasApi('updateStatus', { namaPemesan: pemesan, rowIndex: rowIndex, newStatus: newStatus })
       .then(res => {
         if (res.status !== 'success') {
           alert("Gagal menyinkronkan status ke server: " + res.message);
-          loadRiwayatPesanan(true); 
+          loadRiwayatPesanan(true); // Tarik paksa data original jika error
         }
       });
+    }
+    
+    // Memberikan jeda untuk memperbarui DOM Summary (Agar animasi seleksi HP tidak nyangkut)
+    function filterDanRenderLokalTunda() {
+        setTimeout(() => {
+            filterDanRenderLokal();
+        }, 400); 
     }
 
     function renderPesanan(data) {
@@ -336,7 +384,7 @@
       });
 
       let html = `
-      <div class="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4 flex justify-between items-center shadow-sm mx-1 sm:mx-0">
+      <div class="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4 flex justify-between items-center shadow-sm mx-1 sm:mx-0 transition-all">
           <div>
               <div class="text-[10px] sm:text-[11px] text-blue-600 font-bold uppercase tracking-wider">Total (Kirim/Sampai)</div>
               <div class="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">${validItemCount} dari ${data.length} Item</div>
@@ -398,7 +446,7 @@
       });
       html += `</tbody></table></div>`;
 
-      // TABEL MOBILE (Diperlebar dan disesuaikan agar teks status tidak terpotong)
+      // TABEL MOBILE
       html += `
       <div class="block md:hidden border-t border-b sm:border border-gray-200 sm:rounded-xl shadow-sm -mx-2 sm:mx-0 overflow-hidden bg-white">
           <table class="w-full text-left text-[10px] sm:text-xs">
