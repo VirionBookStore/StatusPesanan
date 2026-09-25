@@ -111,7 +111,7 @@
     // =================================================================
     // PASTE URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA DI SINI
     // =================================================================
-    const GAS_URL = "MASUKAN_URL_WEB_APP_GAS_DISINI";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwMvlVWDa-enbZ7P2AABnszlTTOhSXSJ_sXSiaoczwJlJ554vLVUKATm4wBs5QuYoU4vQ/execI";
 
     let currentUserRole = '';
     let currentIdAkses = '';
@@ -119,7 +119,7 @@
 
     // Fungsi Fetch API menggantikan google.script.run
     async function callGasApi(action, payload = {}) {
-      if (!GAS_URL || GAS_URL === "https://script.google.com/macros/s/AKfycbwMvlVWDa-enbZ7P2AABnszlTTOhSXSJ_sXSiaoczwJlJ554vLVUKATm4wBs5QuYoU4vQ/exec") {
+      if (!GAS_URL || GAS_URL === "MASUKAN_URL_WEB_APP_GAS_DISINI") {
         return { status: 'error', message: 'Variabel GAS_URL belum diatur di dalam kode index.html!' };
       }
       try {
