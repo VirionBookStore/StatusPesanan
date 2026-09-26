@@ -62,7 +62,7 @@
             <h2 class="font-bold text-sm text-gray-800 uppercase">RINCIAN PESANAN</h2>
         </div>
 
-        <!-- TATA LETAK BARU: 1 BARIS UNTUK PEMESAN, STATUS, DAN EXCEL -->
+        <!-- TATA LETAK: 1 BARIS UNTUK PEMESAN, STATUS, DAN EXCEL -->
         <div class="flex gap-2 px-1 sm:px-0 w-full mb-1">
             <select id="filterPemesan" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 truncate">
                 <option value="semua">Pemesan...</option>
@@ -85,7 +85,7 @@
             </button>
         </div>
 
-        <!-- TATA LETAK BARU: 1 BARIS UNTUK PENCARIAN & ICON SYNC -->
+        <!-- TATA LETAK: 1 BARIS UNTUK PENCARIAN & ICON SYNC -->
         <div class="flex gap-2 px-1 sm:px-0 w-full mb-3">
             <input type="text" id="searchJudul" oninput="filterDanRenderLokal()" placeholder="Cari judul buku..." class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-700 flex-grow bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
             
@@ -131,7 +131,7 @@
     let currentUserRole = '';
     let currentIdAkses = '';
     
-    // Variabel Global untuk menyimpan data (Single Fetch API)
+    // Variabel Global
     let globalPesananData = []; 
     let currentFilteredData = [];
 
@@ -266,7 +266,7 @@
             filterDanRenderLokal();
           } catch(e) {}
         } else {
-          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-spinner fa-spin text-xl text-blue-500 mb-2"></i><br>Menarik data master dari server...</div>`;
+          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-spinner fa-spin text-xl text-blue-500 mb-2"></i><br>Menarik data dari server...</div>`;
         }
       } else {
         container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-arrows-rotate fa-spin text-xl text-blue-500 mb-2"></i><br>Menyinkronkan data dengan server...</div>`;
@@ -288,7 +288,7 @@
     }
 
     // =========================================================================
-    // METODE EXPORT EXCEL BARU (LEBIH RAMAH WEBVIEW APK)
+    // METODE EXPORT EXCEL BARU (BYPASS BLOKIR WEBVIEW APK DENGAN SHARE API)
     // =========================================================================
     function exportToExcel() {
         if (!currentFilteredData || currentFilteredData.length === 0) {
@@ -315,6 +315,7 @@
         });
 
         try {
+            // Pembuatan Worksheet
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Data Pesanan");
@@ -324,23 +325,45 @@
             const dateStr = new Date().toISOString().slice(0, 10);
             const fileName = `Report_Pesanan_${pemesanName}_${dateStr}.xlsx`;
             
-            // METODE BASE64 UNTUK APK WEBVIEW KODULAR / MIT APP INVENTOR
-            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
-            const uri = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + wbout;
+            // Konversi ke format ArrayBuffer/Blob agar kompatibel dengan sistem Share/File Android
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
             
-            let downloadLink = document.createElement("a");
-            downloadLink.href = uri;
-            downloadLink.download = fileName;
+            // 1. CARA UTAMA UNTUK APK (Memaksa memunculkan popup "Share" bawaan HP)
+            if (navigator.canShare && navigator.share) {
+                const file = new File([blob], fileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                if (navigator.canShare({ files: [file] })) {
+                    navigator.share({
+                        files: [file],
+                        title: fileName,
+                        text: 'Berikut adalah file excel laporan data pesanan.'
+                    }).then(() => {
+                        console.log('Berhasil membuka menu share/save.');
+                    }).catch((error) => {
+                        console.log('Share batal atau tidak didukung WebView. Mencoba fallback...', error);
+                        forceDownloadHTML(blob, fileName);
+                    });
+                    return; // Stop di sini jika share berhasil di-trigger
+                }
+            }
             
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            
-            // Notifikasi sukses (optional)
-            // alert("Berhasil mengunduh Excel. Silakan periksa folder Download di HP Anda.");
+            // 2. FALLBACK UNTUK BROWSER HP/CHROME
+            forceDownloadHTML(blob, fileName);
+
         } catch(e) {
-            alert("Gagal mengekspor: " + e.message + "\n\nCatatan: Beberapa APK memblokir unduhan. Buka link web ini di Google Chrome untuk mengunduh.");
+            alert("Terjadi kesalahan saat mengekspor: " + e.message);
         }
+    }
+
+    function forceDownloadHTML(blob, fileName) {
+        const url = window.URL.createObjectURL(blob);
+        let downloadLink = document.createElement("a");
+        downloadLink.href = url;
+        downloadLink.download = fileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        window.URL.revokeObjectURL(url);
     }
 
     function getStatusColor(statusStr) {
