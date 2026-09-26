@@ -74,7 +74,17 @@ class MainActivity : ComponentActivity() {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
 
-                    AlertDialog.Builder(this@MainActivity)\n                        .setTitle("File laporan")\n                        .setItems(arrayOf("Bagikan ke aplikasi lain", "Simpan file di HP")) { _, which ->\n                            if (which == 0) {\n                                startActivity(Intent.createChooser(shareIntent, "Bagikan file laporan"))\n                            } else {\n                                pendingSaveFile = file\n                                saveFileLauncher.launch(file.name)\n                            }\n                        }\n                        .show()
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("File laporan")
+                        .setItems(arrayOf("Bagikan ke aplikasi lain", "Simpan file di HP")) { _, which ->
+                            if (which == 0) {
+                                startActivity(Intent.createChooser(shareIntent, "Bagikan file laporan"))
+                            } else {
+                                pendingSaveFile = file
+                                saveFileLauncher.launch(file.name)
+                            }
+                        }
+                        .show()
                 } catch (e: Exception) {
                     Toast.makeText(
                         this@MainActivity,
