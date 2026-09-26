@@ -1,5 +1,6 @@
 package com.virion.statuspesanan
 
+import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ContentProvider
 import android.content.ContentValues
@@ -17,6 +18,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.addCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -28,6 +30,23 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val appUrl = "https://virionbookstore.github.io/StatusPesanan/"
     private var backPressedTime: Long = 0
+    private var pendingSaveFile: File? = null
+
+    private val saveFileLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    ) { uri ->
+        val source = pendingSaveFile
+        pendingSaveFile = null
+        if (uri == null || source == null) return@registerForActivityResult
+        try {
+            contentResolver.openOutputStream(uri)?.use { output ->
+                source.inputStream().use { input -> input.copyTo(output) }
+            } ?: throw IllegalStateException("Tidak dapat membuka lokasi penyimpanan")
+            Toast.makeText(this, "File berhasil disimpan.", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Gagal menyimpan file: " + e.message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     inner class AndroidShareInterface {
         @JavascriptInterface
@@ -55,7 +74,7 @@ class MainActivity : ComponentActivity() {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
 
-                    startActivity(Intent.createChooser(shareIntent, "Bagikan file laporan"))
+                    AlertDialog.Builder(this@MainActivity)\n                        .setTitle("File laporan")\n                        .setItems(arrayOf("Bagikan ke aplikasi lain", "Simpan file di HP")) { _, which ->\n                            if (which == 0) {\n                                startActivity(Intent.createChooser(shareIntent, "Bagikan file laporan"))\n                            } else {\n                                pendingSaveFile = file\n                                saveFileLauncher.launch(file.name)\n                            }\n                        }\n                        .show()
                 } catch (e: Exception) {
                     Toast.makeText(
                         this@MainActivity,
