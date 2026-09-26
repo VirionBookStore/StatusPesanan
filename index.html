@@ -56,35 +56,19 @@
     </header>
 
     <main class="max-w-6xl w-full mx-auto p-1 sm:p-6 space-y-4 flex-grow">
-      <div class="bg-white p-2 sm:p-5 rounded-lg sm:rounded-2xl shadow-sm border border-slate-200 space-y-4 w-full">
+      <div class="bg-white p-2 sm:p-5 rounded-lg sm:rounded-2xl shadow-sm border border-slate-200 space-y-3 w-full">
         
-        <div class="flex flex-col sm:flex-row justify-between items-center border-b border-gray-100 pb-3 gap-2 px-1 sm:px-0">
-            <h2 class="font-bold text-sm text-gray-800 uppercase shrink-0">RINCIAN PESANAN</h2>
-            
-            <div class="flex w-full sm:w-auto items-center justify-end gap-2">
-                <button onclick="exportToExcel()" class="border border-emerald-300 rounded-lg px-3 py-1.5 bg-emerald-50 text-xs text-emerald-700 flex items-center gap-1 hover:bg-emerald-100 transition shrink-0 font-medium">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    Excel
-                </button>
-
-                <button onclick="loadRiwayatPesanan(true)" class="border border-gray-300 rounded-lg px-3 py-1.5 bg-gray-50 text-xs text-gray-700 flex items-center gap-1 hover:bg-gray-100 transition shrink-0">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    Sync
-                </button>
-            </div>
+        <div class="border-b border-gray-100 pb-2 mb-2 px-1 sm:px-0">
+            <h2 class="font-bold text-sm text-gray-800 uppercase">RINCIAN PESANAN</h2>
         </div>
 
-        <!-- BARIS PENCARIAN & FILTER (DITAMBAHKAN) -->
-        <div class="flex flex-col sm:flex-row gap-2 pb-2 px-1 sm:px-0 w-full">
-            <select id="filterPemesan" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 w-full sm:w-1/4 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <option value="semua">Memuat Pemesan...</option>
+        <!-- TATA LETAK BARU: 1 BARIS UNTUK PEMESAN, STATUS, DAN EXCEL -->
+        <div class="flex gap-2 px-1 sm:px-0 w-full mb-1">
+            <select id="filterPemesan" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 truncate">
+                <option value="semua">Pemesan...</option>
             </select>
             
-            <!-- Kolom Pencarian Judul -->
-            <input type="text" id="searchJudul" oninput="filterDanRenderLokal()" placeholder="Cari judul buku..." class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-700 w-full sm:w-2/4 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
-            
-            <!-- Dropdown Filter Status -->
-            <select id="filterStatusApp" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 w-full sm:w-1/4 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <select id="filterStatusApp" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 truncate">
                 <option value="SEMUA">Semua Status</option>
                 <option value="STOCK SYSTEM">Stock System</option>
                 <option value="READY">Ready</option>
@@ -94,6 +78,20 @@
                 <option value="BATAL">Batal</option>
                 <option value="KOSONG">Kosong</option>
             </select>
+
+            <button onclick="exportToExcel()" class="border border-emerald-300 rounded-lg px-2 py-1.5 bg-emerald-50 text-xs text-emerald-700 flex items-center justify-center gap-1 hover:bg-emerald-100 transition shrink-0 font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <span class="hidden sm:inline">Excel</span>
+            </button>
+        </div>
+
+        <!-- TATA LETAK BARU: 1 BARIS UNTUK PENCARIAN & ICON SYNC -->
+        <div class="flex gap-2 px-1 sm:px-0 w-full mb-3">
+            <input type="text" id="searchJudul" oninput="filterDanRenderLokal()" placeholder="Cari judul buku..." class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-700 flex-grow bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+            
+            <button onclick="loadRiwayatPesanan(true)" class="border border-gray-300 rounded-lg w-8 sm:w-10 flex-shrink-0 flex items-center justify-center bg-gray-50 text-gray-700 hover:bg-gray-100 transition" title="Refresh / Sync">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
         </div>
 
         <div id="listPesananContainer" class="space-y-3 w-full">
@@ -230,52 +228,36 @@
         select.value = currentSelected;
       }
       
-      // Setelah filter jadi, tarik data pesanan UTAMA (Single Fetch)
       loadRiwayatPesanan(false);
     }
 
-    // =========================================================================
-    // METODE CLIENT-SIDE FILTERING & OPTIMISTIC UI (DIPERBARUI)
-    // =========================================================================
-    
-    // Fungsi ini dipanggil dari Input Search dan Dropdown Filter (Sangat cepat tanpa loading server)
     function filterDanRenderLokal() {
-        // Ambil nilai dari semua kontrol input
         const filterNama = document.getElementById('filterPemesan').value;
         const keywordJudul = document.getElementById('searchJudul').value.toLowerCase();
         const filterStatus = document.getElementById('filterStatusApp').value.toUpperCase();
         
         currentFilteredData = globalPesananData.filter(item => {
-            // 1. Cek Filter Pemesan
             const cocokPemesan = (filterNama === "semua") || (item.sheetPemesan === filterNama);
-            
-            // 2. Cek Pencarian Judul (.includes untuk pencarian acak/sebagian)
             const judulStr = (item.judul || "").toLowerCase();
             const cocokJudul = judulStr.includes(keywordJudul);
-            
-            // 3. Cek Filter Status
             const statusStr = (item.status || "").toUpperCase().trim();
             const cocokStatus = (filterStatus === "SEMUA") || (statusStr === filterStatus);
             
-            // Tampilkan baris hanya jika cocok dengan SEMUA kriteria di atas
             return cocokPemesan && cocokJudul && cocokStatus;
         });
         
         renderPesanan(currentFilteredData);
     }
 
-    // Mengambil data SEMUA pesanan sekali saja dari server (Single Fetch Pattern)
     function loadRiwayatPesanan(forceRefresh = false) {
       const container = document.getElementById('listPesananContainer');
       const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_master`;
 
-      // Jika tidak force refresh dan data sudah ada di RAM lokal
       if (!forceRefresh && globalPesananData.length > 0) {
         filterDanRenderLokal();
         return;
       }
 
-      // Coba load dari localStorage HP (Cache)
       if (!forceRefresh) {
         const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
@@ -290,7 +272,6 @@
         container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-arrows-rotate fa-spin text-xl text-blue-500 mb-2"></i><br>Menyinkronkan data dengan server...</div>`;
       }
 
-      // Tarik Data (Selalu parameter "semua" agar filter client-side jalan)
       callGasApi('getPesanan', { 
           namaPemesan: "semua", 
           role: currentUserRole,
@@ -306,6 +287,9 @@
       });
     }
 
+    // =========================================================================
+    // METODE EXPORT EXCEL BARU (LEBIH RAMAH WEBVIEW APK)
+    // =========================================================================
     function exportToExcel() {
         if (!currentFilteredData || currentFilteredData.length === 0) {
             alert("Tidak ada data untuk di-export!");
@@ -330,15 +314,33 @@
             return rowData;
         });
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Data Pesanan");
-        
-        const filterValue = document.getElementById('filterPemesan').value;
-        const pemesanName = filterValue === 'semua' ? 'SemuaPemesan' : filterValue;
-        const dateStr = new Date().toISOString().slice(0, 10);
-        
-        XLSX.writeFile(wb, `Report_Pesanan_${pemesanName}_${dateStr}.xlsx`);
+        try {
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data Pesanan");
+            
+            const filterValue = document.getElementById('filterPemesan').value;
+            const pemesanName = filterValue === 'semua' ? 'SemuaPemesan' : filterValue;
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const fileName = `Report_Pesanan_${pemesanName}_${dateStr}.xlsx`;
+            
+            // METODE BASE64 UNTUK APK WEBVIEW KODULAR / MIT APP INVENTOR
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+            const uri = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + wbout;
+            
+            let downloadLink = document.createElement("a");
+            downloadLink.href = uri;
+            downloadLink.download = fileName;
+            
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // Notifikasi sukses (optional)
+            // alert("Berhasil mengunduh Excel. Silakan periksa folder Download di HP Anda.");
+        } catch(e) {
+            alert("Gagal mengekspor: " + e.message + "\n\nCatatan: Beberapa APK memblokir unduhan. Buka link web ini di Google Chrome untuk mengunduh.");
+        }
     }
 
     function getStatusColor(statusStr) {
@@ -353,42 +355,33 @@
       return "bg-gray-100 text-gray-700 border-gray-300"; 
     }
 
-    // PERUBAHAN STATUS INSTAN (OPTIMISTIC UI) - Mencegah Lag di Layar HP
     function changeStatus(selectElem, pemesan, rowIndex) {
       const newStatus = selectElem.value;
       
-      // 1. UPDATE VISUAL LANGSUNG (Tanpa merusak DOM / Re-render tabel)
       let newClass = getStatusColor(newStatus);
       selectElem.className = newClass + " text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-1 border rounded uppercase tracking-tighter outline-none cursor-pointer text-center w-full min-w-[75px] md:min-w-[95px]";
 
-      // 2. UPDATE VARIABEL MEMORI (RAM)
       const itemIndex = globalPesananData.findIndex(item => item.sheetPemesan === pemesan && item.rowIndex === rowIndex);
       if (itemIndex !== -1) {
         globalPesananData[itemIndex].status = newStatus;
         
-        // Simpan perubahannya di Cache HP
         const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_master`;
         localStorage.setItem(cacheKey, JSON.stringify(globalPesananData));
         
-        // Update data filter yang saat ini aktif (Agar nilai kalkulasi summary ikut berubah di memori)
         filterDanRenderLokalTunda();
       }
 
-      // 3. SYNC KE SERVER BACKGROUND
       callGasApi('updateStatus', { namaPemesan: pemesan, rowIndex: rowIndex, newStatus: newStatus })
       .then(res => {
         if (res.status !== 'success') {
           alert("Gagal menyinkronkan status ke server: " + res.message);
-          loadRiwayatPesanan(true); // Tarik paksa data original jika error
+          loadRiwayatPesanan(true); 
         }
       });
     }
     
-    // Memberikan jeda untuk memperbarui DOM Summary (Agar animasi seleksi HP tidak nyangkut)
     function filterDanRenderLokalTunda() {
-        setTimeout(() => {
-            filterDanRenderLokal();
-        }, 400); 
+        setTimeout(() => { filterDanRenderLokal(); }, 400); 
     }
 
     function renderPesanan(data) {
