@@ -1,5 +1,6 @@
 package com.virion.statuspesanan
 
+import android.content.ClipData
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Intent
@@ -50,6 +51,7 @@ class MainActivity : ComponentActivity() {
                         type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         putExtra(Intent.EXTRA_STREAM, uri)
                         putExtra(Intent.EXTRA_TEXT, "Berikut adalah file laporan pesanan.")
+                        clipData = ClipData.newRawUri("Laporan Pesanan", uri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
 
