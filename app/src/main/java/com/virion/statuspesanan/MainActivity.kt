@@ -6,7 +6,6 @@ import android.content.Intent
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
-import android.os.BaseBundle
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.util.Base64
