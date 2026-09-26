@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         fun shareFile(fileName: String, base64Data: String) {
             runOnUiThread {
                 try {
-                    val safeName = fileName.replace(Regex("[\\\\/:*?"<>|]"), "_")
+                    val safeName = fileName.replace(Regex("[^A-Za-z0-9._ -]"), "_")
                     val shareDir = File(cacheDir, "shared")
                     if (!shareDir.exists()) shareDir.mkdirs()
                     shareDir.listFiles()?.forEach { it.delete() }
@@ -135,7 +135,7 @@ class ShareFileProvider : ContentProvider() {
         if (mode != "r") throw SecurityException("Read only")
         val context = context ?: throw IllegalStateException("Context tidak tersedia")
         val name = Uri.decode(uri.lastPathSegment ?: "")
-        val safeName = name.replace(Regex("[\\\\/:*?"<>|]"), "_")
+        val safeName = name.replace(Regex("[^A-Za-z0-9._ -]"), "_")
         val file = File(File(context.cacheDir, "shared"), safeName)
         if (!file.exists()) throw FileNotFoundException(file.absolutePath)
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
