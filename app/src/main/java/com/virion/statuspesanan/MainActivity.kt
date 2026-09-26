@@ -1,8 +1,14 @@
 package com.virion.statuspesanan
 
+import android.content.ContentProvider
+import android.content.ContentValues
 import android.content.Intent
+import android.database.Cursor
+import android.database.MatrixCursor
 import android.net.Uri
+import android.os.BaseBundle
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
@@ -12,11 +18,11 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
-import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import java.io.File
+import java.io.FileNotFoundException
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
@@ -37,10 +43,8 @@ class MainActivity : ComponentActivity() {
                     val bytes = Base64.decode(base64Data, Base64.DEFAULT)
                     file.outputStream().use { it.write(bytes) }
 
-                    val uri: Uri = FileProvider.getUriForFile(
-                        this@MainActivity,
-                        "$packageName.fileprovider",
-                        file
+                    val uri = Uri.parse(
+                        "content://" + packageName + ".sharedfiles/" + Uri.encode(safeName)
                     )
 
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -64,10 +68,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_main)
-
         webView = findViewById(R.id.webView)
 
         ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
@@ -89,18 +91,13 @@ class MainActivity : ComponentActivity() {
         webView.addJavascriptInterface(AndroidShareInterface(), "AndroidInterface")
 
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
-                view: WebView,
-                request: WebResourceRequest
-            ): Boolean {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url.toString()
                 if (url.startsWith("https://") || url.startsWith("http://")) return false
                 return try {
                     startActivity(Intent(Intent.ACTION_VIEW, request.url))
                     true
-                } catch (_: Exception) {
-                    false
-                }
+                } catch (_: Exception) { false }
             }
         }
 
@@ -113,11 +110,7 @@ class MainActivity : ComponentActivity() {
                 if (backPressedTime + 2000 > System.currentTimeMillis()) {
                     finish()
                 } else {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Tekan kembali sekali lagi untuk keluar",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@MainActivity, "Tekan kembali sekali lagi untuk keluar", Toast.LENGTH_SHORT).show()
                 }
                 backPressedTime = System.currentTimeMillis()
             }
@@ -129,4 +122,34 @@ class MainActivity : ComponentActivity() {
         webView.destroy()
         super.onDestroy()
     }
+}
+
+class ShareFileProvider : ContentProvider() {
+    override fun onCreate(): Boolean = true
+
+    override fun getType(uri: Uri): String =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
+        if (mode != "r") throw SecurityException("Read only")
+        val context = context ?: throw IllegalStateException("Context tidak tersedia")
+        val name = Uri.decode(uri.lastPathSegment ?: "")
+        val safeName = name.replace(Regex("[\\\\/:*?"<>|]"), "_")
+        val file = File(File(context.cacheDir, "shared"), safeName)
+        if (!file.exists()) throw FileNotFoundException(file.absolutePath)
+        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+    }
+
+    override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor {
+        val context = context ?: throw IllegalStateException("Context tidak tersedia")
+        val name = Uri.decode(uri.lastPathSegment ?: "")
+        val file = File(File(context.cacheDir, "shared"), name)
+        val cursor = MatrixCursor(arrayOf("_display_name", "_size"))
+        if (file.exists()) cursor.addRow(arrayOf(file.name, file.length()))
+        return cursor
+    }
+
+    override fun insert(uri: Uri, values: ContentValues?): Uri? = throw UnsupportedOperationException("Read only")
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = throw UnsupportedOperationException("Read only")
+    override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int = throw UnsupportedOperationException("Read only")
 }
