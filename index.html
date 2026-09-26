@@ -61,12 +61,7 @@
         <div class="flex flex-col sm:flex-row justify-between items-center border-b border-gray-100 pb-3 gap-2 px-1 sm:px-0">
             <h2 class="font-bold text-sm text-gray-800 uppercase shrink-0">RINCIAN PESANAN</h2>
             
-            <div class="flex w-full sm:w-auto items-center gap-2">
-                <!-- Dropdown Filter sekarang memicu filter lokal (instan) -->
-                <select id="filterPemesan" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-grow sm:w-48 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <option value="semua">Memuat...</option>
-                </select>
-                
+            <div class="flex w-full sm:w-auto items-center justify-end gap-2">
                 <button onclick="exportToExcel()" class="border border-emerald-300 rounded-lg px-3 py-1.5 bg-emerald-50 text-xs text-emerald-700 flex items-center gap-1 hover:bg-emerald-100 transition shrink-0 font-medium">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Excel
@@ -77,6 +72,28 @@
                     Sync
                 </button>
             </div>
+        </div>
+
+        <!-- BARIS PENCARIAN & FILTER (DITAMBAHKAN) -->
+        <div class="flex flex-col sm:flex-row gap-2 pb-2 px-1 sm:px-0 w-full">
+            <select id="filterPemesan" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 w-full sm:w-1/4 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="semua">Memuat Pemesan...</option>
+            </select>
+            
+            <!-- Kolom Pencarian Judul -->
+            <input type="text" id="searchJudul" oninput="filterDanRenderLokal()" placeholder="Cari judul buku..." class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-700 w-full sm:w-2/4 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+            
+            <!-- Dropdown Filter Status -->
+            <select id="filterStatusApp" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 w-full sm:w-1/4 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="SEMUA">Semua Status</option>
+                <option value="STOCK SYSTEM">Stock System</option>
+                <option value="READY">Ready</option>
+                <option value="KIRIM">Kirim</option>
+                <option value="SAMPAI">Sampai</option>
+                <option value="SELESAI">Selesai</option>
+                <option value="BATAL">Batal</option>
+                <option value="KOSONG">Kosong</option>
+            </select>
         </div>
 
         <div id="listPesananContainer" class="space-y-3 w-full">
@@ -218,18 +235,31 @@
     }
 
     // =========================================================================
-    // METODE CLIENT-SIDE FILTERING & OPTIMISTIC UI
+    // METODE CLIENT-SIDE FILTERING & OPTIMISTIC UI (DIPERBARUI)
     // =========================================================================
     
-    // Fungsi ini dipanggil dari Dropdown HTML "onchange" (Sangat cepat tanpa loading server)
+    // Fungsi ini dipanggil dari Input Search dan Dropdown Filter (Sangat cepat tanpa loading server)
     function filterDanRenderLokal() {
+        // Ambil nilai dari semua kontrol input
         const filterNama = document.getElementById('filterPemesan').value;
+        const keywordJudul = document.getElementById('searchJudul').value.toLowerCase();
+        const filterStatus = document.getElementById('filterStatusApp').value.toUpperCase();
         
-        if (filterNama === "semua") {
-            currentFilteredData = globalPesananData;
-        } else {
-            currentFilteredData = globalPesananData.filter(item => item.sheetPemesan === filterNama);
-        }
+        currentFilteredData = globalPesananData.filter(item => {
+            // 1. Cek Filter Pemesan
+            const cocokPemesan = (filterNama === "semua") || (item.sheetPemesan === filterNama);
+            
+            // 2. Cek Pencarian Judul (.includes untuk pencarian acak/sebagian)
+            const judulStr = (item.judul || "").toLowerCase();
+            const cocokJudul = judulStr.includes(keywordJudul);
+            
+            // 3. Cek Filter Status
+            const statusStr = (item.status || "").toUpperCase().trim();
+            const cocokStatus = (filterStatus === "SEMUA") || (statusStr === filterStatus);
+            
+            // Tampilkan baris hanya jika cocok dengan SEMUA kriteria di atas
+            return cocokPemesan && cocokJudul && cocokStatus;
+        });
         
         renderPesanan(currentFilteredData);
     }
