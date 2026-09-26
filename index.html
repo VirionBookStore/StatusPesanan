@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>App Cek Status Pesanan</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Library untuk Export Excel -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col font-sans">
 
@@ -62,7 +60,7 @@
             <h2 class="font-bold text-sm text-gray-800 uppercase">RINCIAN PESANAN</h2>
         </div>
 
-        <!-- TATA LETAK: 1 BARIS UNTUK PEMESAN, STATUS, DAN EXCEL -->
+        <!-- TATA LETAK: 1 BARIS UNTUK PEMESAN, STATUS, DAN TOMBOL BAGIKAN -->
         <div class="flex gap-2 px-1 sm:px-0 w-full mb-1">
             <select id="filterPemesan" onchange="filterDanRenderLokal()" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 flex-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 truncate">
                 <option value="semua">Pemesan...</option>
@@ -79,9 +77,10 @@
                 <option value="KOSONG">Kosong</option>
             </select>
 
-            <button onclick="exportToExcel()" class="border border-emerald-300 rounded-lg px-2 py-1.5 bg-emerald-50 text-xs text-emerald-700 flex items-center justify-center gap-1 hover:bg-emerald-100 transition shrink-0 font-medium">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                <span class="hidden sm:inline">Excel</span>
+            <!-- TOMBOL BAGIKAN (GANTI EXCEL) -->
+            <button onclick="shareDataReport()" class="border border-blue-300 rounded-lg px-2.5 py-1.5 bg-blue-50 text-xs text-blue-700 flex items-center justify-center gap-1 hover:bg-blue-100 transition shrink-0 font-medium" title="Bagikan Laporan">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                <span class="hidden sm:inline">Bagikan</span>
             </button>
         </div>
 
@@ -131,7 +130,6 @@
     let currentUserRole = '';
     let currentIdAkses = '';
     
-    // Variabel Global
     let globalPesananData = []; 
     let currentFilteredData = [];
 
@@ -266,10 +264,10 @@
             filterDanRenderLokal();
           } catch(e) {}
         } else {
-          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-spinner fa-spin text-xl text-blue-500 mb-2"></i><br>Menarik data dari server...</div>`;
+          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8">Memuat data dari server...</div>`;
         }
       } else {
-        container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-arrows-rotate fa-spin text-xl text-blue-500 mb-2"></i><br>Menyinkronkan data dengan server...</div>`;
+        container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8">Menyinkronkan data dengan server...</div>`;
       }
 
       callGasApi('getPesanan', { 
@@ -288,82 +286,47 @@
     }
 
     // =========================================================================
-    // METODE EXPORT EXCEL BARU (BYPASS BLOKIR WEBVIEW APK DENGAN SHARE API)
+    // FITUR BAGIKAN (SHARE API) - BISA LANGSUNG KE WA ATAU SIMPAN KE FILE/DRIVE
     // =========================================================================
-    function exportToExcel() {
+    function shareDataReport() {
         if (!currentFilteredData || currentFilteredData.length === 0) {
-            alert("Tidak ada data untuk di-export!");
+            alert("Tidak ada data untuk dibagikan!");
             return;
         }
-        
+
         let isUser = currentUserRole.toLowerCase() === 'user';
-        let exportData = currentFilteredData.map((item, index) => {
-            let rowData = {
-                "No": index + 1,
-                "Nama Pemesan": item.sheetPemesan,
-                "Judul Buku": item.judul,
-                "Harga (Rp)": item.harga,
-            };
-            if (!isUser) rowData["Diskon (%)"] = item.disc;
-            rowData["Qty"] = item.qty;
+        let textReport = "📋 *LAPORAN STATUS PESANAN*\n";
+        textReport += `Tanggal: ${new Date().toLocaleDateString('id-ID')}\n`;
+        textReport += `Total Item: ${currentFilteredData.length}\n\n`;
+
+        currentFilteredData.forEach((item, index) => {
+            textReport += `${index + 1}. *${item.judul}*\n`;
+            textReport += `   - Pemesan: ${item.sheetPemesan}\n`;
+            textReport += `   - Qty: ${item.qty} | Status: *${item.status}*\n`;
             if (!isUser) {
-                rowData["Total Brutto (Rp)"] = item.brutto;
-                rowData["Total Netto (Rp)"] = item.netto;
+                textReport += `   - Netto: ${fmt(item.netto)}\n`;
             }
-            rowData["Status"] = item.status;
-            return rowData;
+            textReport += `-------------------\n`;
         });
 
-        try {
-            // Pembuatan Worksheet
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Data Pesanan");
-            
-            const filterValue = document.getElementById('filterPemesan').value;
-            const pemesanName = filterValue === 'semua' ? 'SemuaPemesan' : filterValue;
-            const dateStr = new Date().toISOString().slice(0, 10);
-            const fileName = `Report_Pesanan_${pemesanName}_${dateStr}.xlsx`;
-            
-            // Konversi ke format ArrayBuffer/Blob agar kompatibel dengan sistem Share/File Android
-            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-            
-            // 1. CARA UTAMA UNTUK APK (Memaksa memunculkan popup "Share" bawaan HP)
-            if (navigator.canShare && navigator.share) {
-                const file = new File([blob], fileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                if (navigator.canShare({ files: [file] })) {
-                    navigator.share({
-                        files: [file],
-                        title: fileName,
-                        text: 'Berikut adalah file excel laporan data pesanan.'
-                    }).then(() => {
-                        console.log('Berhasil membuka menu share/save.');
-                    }).catch((error) => {
-                        console.log('Share batal atau tidak didukung WebView. Mencoba fallback...', error);
-                        forceDownloadHTML(blob, fileName);
-                    });
-                    return; // Stop di sini jika share berhasil di-trigger
-                }
-            }
-            
-            // 2. FALLBACK UNTUK BROWSER HP/CHROME
-            forceDownloadHTML(blob, fileName);
-
-        } catch(e) {
-            alert("Terjadi kesalahan saat mengekspor: " + e.message);
+        // Cek apakah perangkat mendukung Web Share API (Standar Android WebView & Browser HP)
+        if (navigator.share) {
+            navigator.share({
+                title: 'Laporan Status Pesanan',
+                text: textReport,
+            }).then(() => {
+                console.log('Berhasil dibagikan');
+            }).catch((error) => {
+                console.log('Bagikan dibatalkan', error);
+            });
+        } else {
+            // Fallback jika tidak didukung: Salin teks otomatis ke clipboard
+            navigator.clipboard.writeText(textReport).then(() => {
+                alert("Laporan berhasil disalin ke clipboard! Silakan tempel (paste) langsung ke WhatsApp.");
+            }).catch(err => {
+                alert("Gagal menyalin teks laporan.");
+            });
         }
-    }
-
-    function forceDownloadHTML(blob, fileName) {
-        const url = window.URL.createObjectURL(blob);
-        let downloadLink = document.createElement("a");
-        downloadLink.href = url;
-        downloadLink.download = fileName;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        window.URL.revokeObjectURL(url);
     }
 
     function getStatusColor(statusStr) {
