@@ -391,22 +391,30 @@
             const dateStr = new Date().toISOString().slice(0, 10);
             const fileName = `Report_Pesanan_${pemesanName}_${dateStr}.xlsx`;
             
-            // Generate File sebagai objek Blob
+            // APK: kirim isi file XLSX ke Android melalui bridge native.
+            // WebView Android tidak selalu mendukung navigator.share({ files }) untuk Blob/File.
             const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-            const file = new File([blob], fileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            const bytes = new Uint8Array(wbout);
+            let binary = '';
+            const chunkSize = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+            }
+            const base64 = btoa(binary);
 
-            // Memanggil menu Share File Android
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            if (window.AndroidInterface && typeof window.AndroidInterface.shareFile === 'function') {
+                window.AndroidInterface.shareFile(fileName, base64);
+            } else if (navigator.share) {
+                // Fallback untuk browser/WebView yang mendukung Web Share API.
+                const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                const file = new File([blob], fileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
                 navigator.share({
                     files: [file],
                     title: fileName,
                     text: 'Berikut adalah file laporan pesanan.'
-                }).catch((error) => {
-                    console.log('Bagikan dibatalkan', error);
-                });
+                }).catch(() => {});
             } else {
-                alert("Fitur bagikan file tidak didukung penuh pada versi WebView perangkat ini.");
+                alert("Fitur bagikan file belum tersedia pada APK ini.");
             }
         } catch(e) {
             alert("Gagal memproses file: " + e.message);
