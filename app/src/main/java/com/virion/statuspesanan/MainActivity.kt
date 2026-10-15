@@ -5,6 +5,8 @@ import android.content.ClipData
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.Manifest
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
@@ -14,12 +16,15 @@ import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
+import android.webkit.WebChromeClient
+import android.webkit.PermissionRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.addCallback
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -31,6 +36,21 @@ class MainActivity : ComponentActivity() {
     private val appUrl = "https://virionbookstore.github.io/StatusPesanan/"
     private var backPressedTime: Long = 0
     private var pendingSaveFile: File? = null
+    private var pendingCameraRequest: PermissionRequest? = null
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val request = pendingCameraRequest
+        pendingCameraRequest = null
+        if (request != null) {
+            if (granted && request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+            } else {
+                request.deny()
+            }
+        }
+    }
 
     private val saveFileLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -119,6 +139,42 @@ class MainActivity : ComponentActivity() {
         }
 
         webView.addJavascriptInterface(AndroidShareInterface(), "AndroidInterface")
+
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: PermissionRequest) {
+                runOnUiThread {
+                    val origin = request.origin
+                    val trustedOrigin =
+                        origin.scheme == "https" &&
+                        origin.host == "virionbookstore.github.io"
+                    val wantsCamera =
+                        request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+
+                    if (!trustedOrigin || !wantsCamera) {
+                        request.deny()
+                        return@runOnUiThread
+                    }
+
+                    if (ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.CAMERA
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+                    } else {
+                        pendingCameraRequest?.deny()
+                        pendingCameraRequest = request
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                }
+            }
+
+            override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                if (pendingCameraRequest == request) {
+                    pendingCameraRequest = null
+                }
+            }
+        }
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
