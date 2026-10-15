@@ -138,7 +138,7 @@
     // ==============================================================================
     // GANTI LINK DI BAWAH DENGAN URL GOOGLE APPS SCRIPT ANDA YANG BARU DI-DEPLOY
     // ==============================================================================
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbyj_SH2R2a1wjup0Tc_Yufgx2x-XGfAL9ODrVIYMsVcjCyTIe8Nd6H0WZRKt4FfsO65Ng/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzGH_Z38ufYTKi6IMoD1zcSnjeyPO33woZZrVycoINLx9VNbwhUORqFv678D096ZCTu1Q/exec";
 
     let currentUserRole = '';
     let currentIdAkses = '';
@@ -147,6 +147,53 @@
     let currentFilteredData = [];
     let scannerStream = null;
     let scannerActive = false;
+
+    // ==========================================
+    // INDEXEDDB DATABASE UNTUK CACHE LOKAL
+    // ==========================================
+    const DB_NAME = 'CSP_AppDB';
+    const STORE_NAME = 'cache_pesanan';
+    const DB_VERSION = 1;
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME);
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function setCache(key, data) {
+        try {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put(data, key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        } catch(e) { console.error('IDB Set Error:', e); }
+    }
+
+    async function getCache(key) {
+        try {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.get(key);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        } catch(e) { return null; }
+    }
 
     // Fungsi untuk mendeteksi apakah dibuka dari dalam APK (WebView) atau Browser Web
     function isRunningInApp() {
@@ -263,11 +310,19 @@
           try {
             const codes = await detector.detect(video);
             if (codes && codes.length && codes[0].rawValue) {
-              const scanned = String(codes[0].rawValue).trim(); closeScanner();
-              document.getElementById('searchJudul').value = scanned; filterDanRenderLokal();
-              const found = globalPesananData.some(item => String(item.barcode || '').trim() === scanned);
-              if (!found) alert('Barcode ' + scanned + ' belum ditemukan pada data pesanan yang dimuat. Pastikan kolom Barcode di Google Sheets sudah diisi dan data sudah disinkronkan.');
-              document.getElementById('listPesananContainer').scrollIntoView({behavior:'smooth',block:'start'}); return;
+              const scanned = String(codes[0].rawValue).trim().toLowerCase(); // Jadikan huruf kecil
+              closeScanner();
+              document.getElementById('searchJudul').value = scanned; 
+              filterDanRenderLokal();
+              
+              // Pengecekan dengan toleransi huruf dan spasi
+              const found = globalPesananData.some(item => String(item.barcode || '').trim().toLowerCase() === scanned);
+              
+              if (!found) {
+                  alert('Barcode ' + scanned.toUpperCase() + ' belum ditemukan pada data pesanan yang dimuat. Pastikan kolom Barcode di Google Sheets sudah diisi dan data sudah disinkronkan.');
+              }
+              document.getElementById('listPesananContainer').scrollIntoView({behavior:'smooth',block:'start'}); 
+              return;
             }
           } catch (e) {}
           if (scannerActive) setTimeout(scanFrame, 180);
@@ -330,9 +385,9 @@
         renderPesanan(currentFilteredData);
     }
 
-    function loadRiwayatPesanan(forceRefresh = false) {
+    async function loadRiwayatPesanan(forceRefresh = false) {
       const container = document.getElementById('listPesananContainer');
-      const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_master`;
+      const cacheKey = `data_pesanan_${currentUserRole}_${currentIdAkses}`;
 
       if (!forceRefresh && globalPesananData.length > 0) {
         filterDanRenderLokal();
@@ -340,12 +395,10 @@
       }
 
       if (!forceRefresh) {
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-          try {
-            globalPesananData = JSON.parse(cachedData);
-            filterDanRenderLokal();
-          } catch(e) {}
+        const cachedData = await getCache(cacheKey);
+        if (cachedData && cachedData.length > 0) {
+          globalPesananData = cachedData;
+          filterDanRenderLokal();
         } else {
           container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8">Memuat data dari server...</div>`;
         }
@@ -357,13 +410,16 @@
           namaPemesan: "semua", 
           role: currentUserRole,
           id_akses: currentIdAkses
-      }).then(res => {
+      }).then(async res => {
         if (res.status === 'success') {
             globalPesananData = res.data; 
-            localStorage.setItem(cacheKey, JSON.stringify(res.data));
+            await setCache(cacheKey, res.data); // Simpan ke IndexedDB
             filterDanRenderLokal();
-        } else if (!localStorage.getItem(cacheKey)) {
-            container.innerHTML = `<div class="text-center text-rose-500 text-xs py-3">Gagal memuat data dari server.</div>`;
+        } else {
+            const cachedData = await getCache(cacheKey);
+            if (!cachedData) {
+                container.innerHTML = `<div class="text-center text-rose-500 text-xs py-3">Gagal memuat data dari server.</div>`;
+            }
         }
       });
     }
@@ -494,9 +550,8 @@
       return "bg-gray-100 text-gray-700 border-gray-300"; 
     }
 
-    function changeStatus(selectElem, pemesan, rowIndex) {
+    async function changeStatus(selectElem, pemesan, rowIndex) {
       const newStatus = selectElem.value;
-      
       let newClass = getStatusColor(newStatus);
       selectElem.className = newClass + " text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-1 border rounded uppercase tracking-tighter outline-none cursor-pointer text-center w-full min-w-[75px] md:min-w-[95px]";
 
@@ -504,8 +559,8 @@
       if (itemIndex !== -1) {
         globalPesananData[itemIndex].status = newStatus;
         
-        const cacheKey = `cache_pesanan_${currentUserRole}_${currentIdAkses}_master`;
-        localStorage.setItem(cacheKey, JSON.stringify(globalPesananData));
+        const cacheKey = `data_pesanan_${currentUserRole}_${currentIdAkses}`;
+        await setCache(cacheKey, globalPesananData); // Simpan status baru ke IndexedDB
         
         filterDanRenderLokalTunda();
       }
@@ -518,7 +573,6 @@
         }
       });
     }
-    
     function filterDanRenderLokalTunda() {
         setTimeout(() => { filterDanRenderLokal(); }, 400); 
     }
