@@ -89,6 +89,7 @@
         <div class="flex gap-2 px-1 sm:px-0 w-full mb-3">
             <input type="text" id="searchJudul" oninput="filterDanRenderLokal()" placeholder="Cari judul buku..." class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-700 flex-grow bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
             
+            <button onclick="openScanner()" class="border border-blue-300 rounded-lg px-2.5 flex-shrink-0 flex items-center justify-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-xs font-medium" title="Scan barcode"><span aria-hidden="true">▥</span><span>Scan</span></button>
             <button onclick="loadRiwayatPesanan(true)" class="border border-gray-300 rounded-lg w-8 sm:w-10 flex-shrink-0 flex items-center justify-center bg-gray-50 text-gray-700 hover:bg-gray-100 transition" title="Refresh / Sync">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
             </button>
@@ -99,6 +100,17 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- MODAL PEMINDAI BARCODE -->
+  <div id="scannerModal" class="fixed inset-0 bg-slate-950/90 hidden items-center justify-center p-4 z-[60]">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-4 space-y-3">
+      <div class="flex items-center justify-between"><h3 class="font-bold text-slate-800">Scan Barcode Pesanan</h3><button type="button" onclick="closeScanner()" class="text-2xl font-bold text-slate-500" aria-label="Tutup">&times;</button></div>
+      <p class="text-xs text-slate-500">Arahkan kamera ke barcode pada barang. Izinkan akses kamera jika diminta.</p>
+      <video id="scannerVideo" class="w-full rounded-xl bg-black aspect-video object-cover" autoplay muted playsinline></video>
+      <div id="scannerMessage" class="text-sm text-center text-slate-600">Menyiapkan kamera...</div>
+      <button type="button" onclick="closeScanner()" class="w-full py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold">Tutup Pemindai</button>
+    </div>
   </div>
 
   <!-- MODAL PENGATURAN LOGO -->
@@ -133,6 +145,8 @@
     
     let globalPesananData = []; 
     let currentFilteredData = [];
+    let scannerStream = null;
+    let scannerActive = false;
 
     // Fungsi untuk mendeteksi apakah dibuka dari dalam APK (WebView) atau Browser Web
     function isRunningInApp() {
@@ -220,7 +234,53 @@
     }
 
     function handleLogout() {
-      if (confirm("Apakah anda benar ingin keluar?")) { localStorage.clear(); location.reload(); }
+      // Hapus hanya sesi login, jangan hapus cache data pesanan atau konfigurasi lain.
+      ['so_user_nama', 'so_user_role', 'so_user_id_akses'].forEach(key => localStorage.removeItem(key));
+      if (typeof closeScanner === 'function') closeScanner();
+      currentUserRole = ''; currentIdAkses = ''; globalPesananData = []; currentFilteredData = [];
+      document.getElementById('dashboardSection').classList.add('hidden');
+      document.getElementById('loginSection').classList.remove('hidden');
+      document.getElementById('username').value = ''; document.getElementById('password').value = '';
+      document.getElementById('alertBox').classList.add('hidden');
+      document.getElementById('btnSettingLogo').classList.add('hidden');
+      document.getElementById('filterPemesan').innerHTML = '<option value="semua">Semua Pemesan</option>';
+      document.getElementById('listPesananContainer').innerHTML = '';
+    }
+
+    async function openScanner() {
+      const modal = document.getElementById('scannerModal');
+      const video = document.getElementById('scannerVideo');
+      const message = document.getElementById('scannerMessage');
+      modal.classList.remove('hidden'); modal.classList.add('flex'); message.textContent = 'Menyiapkan kamera...';
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { message.textContent = 'Kamera tidak didukung. Pastikan aplikasi dibuka melalui HTTPS dan izin kamera tersedia.'; return; }
+      if (!('BarcodeDetector' in window)) { message.textContent = 'Pemindai barcode belum didukung browser/WebView ini.'; return; }
+      try {
+        const detector = new BarcodeDetector({formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','qr_code']});
+        scannerStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+        video.srcObject = scannerStream; await video.play(); scannerActive = true; message.textContent = 'Arahkan kamera ke barcode...';
+        const scanFrame = async () => {
+          if (!scannerActive || !video.srcObject) return;
+          try {
+            const codes = await detector.detect(video);
+            if (codes && codes.length && codes[0].rawValue) {
+              const scanned = String(codes[0].rawValue).trim(); closeScanner();
+              document.getElementById('searchJudul').value = scanned; filterDanRenderLokal();
+              const found = globalPesananData.some(item => String(item.barcode || '').trim() === scanned);
+              if (!found) alert('Barcode ' + scanned + ' belum ditemukan pada data pesanan yang dimuat. Pastikan kolom Barcode di Google Sheets sudah diisi dan data sudah disinkronkan.');
+              document.getElementById('listPesananContainer').scrollIntoView({behavior:'smooth',block:'start'}); return;
+            }
+          } catch (e) {}
+          if (scannerActive) setTimeout(scanFrame, 180);
+        };
+        scanFrame();
+      } catch (err) { message.textContent = 'Kamera gagal dibuka: ' + (err && err.message ? err.message : err); }
+    }
+
+    function closeScanner() {
+      scannerActive = false;
+      if (scannerStream) { scannerStream.getTracks().forEach(track => track.stop()); scannerStream = null; }
+      const video = document.getElementById('scannerVideo'); if (video) video.srcObject = null;
+      const modal = document.getElementById('scannerModal'); if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
     }
 
     function loadDaftarPemesan() {
@@ -259,7 +319,8 @@
         currentFilteredData = globalPesananData.filter(item => {
             const cocokPemesan = (filterNama === "semua") || (item.sheetPemesan === filterNama);
             const judulStr = (item.judul || "").toLowerCase();
-            const cocokJudul = judulStr.includes(keywordJudul);
+            const barcodeStr = String(item.barcode || "").toLowerCase();
+            const cocokJudul = judulStr.includes(keywordJudul) || barcodeStr.includes(keywordJudul);
             const statusStr = (item.status || "").toUpperCase().trim();
             const cocokStatus = (filterStatus === "SEMUA") || (statusStr === filterStatus);
             
@@ -508,6 +569,7 @@
                       <th class="p-3 font-bold text-right">Harga</th>
                       ${!isUser ? `<th class="p-3 font-bold text-center">Disc</th>` : ''}
                       <th class="p-3 font-bold text-center">Qty</th>
+                      <th class="p-3 font-bold text-left">Keterangan</th>
                       ${!isUser ? `<th class="p-3 font-bold text-right">Tot Brutto</th>` : ''}
                       ${!isUser ? `<th class="p-3 font-bold text-right">Tot Netto</th>` : ''}
                       <th class="p-3 font-bold text-center">Status</th>
@@ -524,6 +586,7 @@
                       <td class="p-3 text-right text-gray-600">${fmt(item.harga)}</td>
                       ${!isUser ? `<td class="p-3 text-center font-bold ${colorDisc}">${item.disc}%</td>` : ''}
                       <td class="p-3 text-center font-bold text-gray-800">${item.qty}</td>
+                      <td class="p-3 text-left text-gray-700">${item.keterangan || ''} </td>
                       ${!isUser ? `<td class="p-3 text-right text-gray-600">${fmt(item.brutto)}</td>` : ''}
                       ${!isUser ? `<td class="p-3 text-right font-bold text-blue-600">${fmt(item.netto)}</td>` : ''}
                       <td class="p-3 text-center">
@@ -556,7 +619,8 @@
                       <th class="p-1.5 sm:p-2 font-bold w-[40%]">Judul</th>
                       <th class="p-1.5 sm:p-2 font-bold text-right leading-tight">Harga${!isUser ? '<br>Disc' : ''}</th>
                       ${!isUser ? `<th class="p-1.5 sm:p-2 font-bold text-right leading-tight">Brutto<br>Netto</th>` : ''}
-                      <th class="p-1.5 sm:p-2 font-bold text-center leading-tight">Status<br>Qty</th>
+                      <th class="p-1.5 sm:p-2 font-bold text-center leading-tight">Status<br>Stok</th>
+                      <th class="p-1.5 sm:p-2 font-bold text-left leading-tight">Keterangan</th>
                   </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">`;
@@ -595,9 +659,10 @@
                                   ${item.status}
                               </span>
                               `}
-                              <span class="font-bold text-gray-700 text-[10px]">Qty: ${item.qty}</span>
+                              <span class="font-bold text-gray-700 text-[10px]">${item.qty}</span>
                           </div>
                       </td>
+                      <td class="p-1.5 sm:p-2 text-left align-middle text-gray-700 break-words">${item.keterangan || ''} </td>
                   </tr>`;
       });
       html += `</tbody></table></div>`;
