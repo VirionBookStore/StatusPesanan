@@ -87,11 +87,15 @@
 
         <!-- TATA LETAK: 1 BARIS UNTUK PENCARIAN & ICON SYNC -->
         <div class="flex gap-2 px-1 sm:px-0 w-full mb-3">
-            <input type="text" id="searchJudul" oninput="filterDanRenderLokal()" placeholder="Cari judul buku..." class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-700 flex-grow bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <input type="text" id="searchJudul" oninput="debounceFilter()" placeholder="Ketik kata acak..." class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-700 flex-grow bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
             
-            <button onclick="openScanner()" class="border border-blue-300 rounded-lg px-2.5 flex-shrink-0 flex items-center justify-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-xs font-medium" title="Scan barcode"><span aria-hidden="true">▥</span><span>Scan</span></button>
-            <button onclick="loadRiwayatPesanan(true)" class="border border-gray-300 rounded-lg w-8 sm:w-10 flex-shrink-0 flex items-center justify-center bg-gray-50 text-gray-700 hover:bg-gray-100 transition" title="Refresh / Sync">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <button onclick="openScanner()" class="border border-blue-300 rounded-lg px-2 flex-shrink-0 flex items-center justify-center bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-xs font-medium" title="Scan barcode">
+                <span aria-hidden="true" class="text-sm">▥</span>
+            </button>
+            
+            <button onclick="loadRiwayatPesanan(true)" class="border border-emerald-300 rounded-lg px-2.5 flex-shrink-0 flex items-center justify-center gap-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-xs font-bold" title="Update Database Lokal">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <span>Update DB</span>
             </button>
         </div>
 
@@ -366,16 +370,34 @@
       loadRiwayatPesanan(false);
     }
 
+    // === FITUR ANTI-LAG (DEBOUNCE) ===
+    let debounceTimer;
+    function debounceFilter() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            filterDanRenderLokal();
+        }, 300); // Render ulang ditunda 300 milidetik setelah berhenti mengetik
+    }
+
+    // === FITUR PENCARIAN KATA ACAK ===
     function filterDanRenderLokal() {
         const filterNama = document.getElementById('filterPemesan').value;
-        const keywordJudul = document.getElementById('searchJudul').value.toLowerCase();
+        const rawSearch = document.getElementById('searchJudul').value.toLowerCase().trim();
+        const searchKeywords = rawSearch ? rawSearch.split(/\s+/) : []; // Pecah kata berdasarkan spasi
         const filterStatus = document.getElementById('filterStatusApp').value.toUpperCase();
         
         currentFilteredData = globalPesananData.filter(item => {
             const cocokPemesan = (filterNama === "semua") || (item.sheetPemesan === filterNama);
+            
             const judulStr = (item.judul || "").toLowerCase();
             const barcodeStr = String(item.barcode || "").toLowerCase();
-            const cocokJudul = judulStr.includes(keywordJudul) || barcodeStr.includes(keywordJudul);
+            
+            // Logika Pencarian Kata Acak (Semua kata yang diketik harus ada di judul/barcode)
+            let cocokJudul = true;
+            if (searchKeywords.length > 0) {
+                cocokJudul = searchKeywords.every(kw => judulStr.includes(kw) || barcodeStr.includes(kw));
+            }
+
             const statusStr = (item.status || "").toUpperCase().trim();
             const cocokStatus = (filterStatus === "SEMUA") || (statusStr === filterStatus);
             
@@ -389,23 +411,25 @@
       const container = document.getElementById('listPesananContainer');
       const cacheKey = `data_pesanan_${currentUserRole}_${currentIdAkses}`;
 
-      if (!forceRefresh && globalPesananData.length > 0) {
-        filterDanRenderLokal();
-        return;
-      }
-
+      // JIKA TIDAK DITEKAN TOMBOL UPDATE DB
       if (!forceRefresh) {
         const cachedData = await getCache(cacheKey);
+        
+        // JIKA DATA LOKAL ADA -> LANGSUNG TAMPILKAN DAN BERHENTI (TIDAK HUBUNGI SERVER)
         if (cachedData && cachedData.length > 0) {
           globalPesananData = cachedData;
           filterDanRenderLokal();
+          return; // <--- INI KUNCINYA AGAR LOADING AWAL SANGAT CEPAT
         } else {
-          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8">Memuat data dari server...</div>`;
+          container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8">Database kosong, mengambil data dari server...</div>`;
         }
-      } else {
-        container.innerHTML = `<div class="text-center text-slate-400 text-xs py-8">Menyinkronkan data dengan server...</div>`;
+      } 
+      // JIKA TOMBOL UPDATE DB DITEKAN
+      else {
+        container.innerHTML = `<div class="text-center text-emerald-600 font-bold text-xs py-8">Mengupdate database dari server (Mohon Tunggu)...</div>`;
       }
 
+      // HUBUNGI GOOGLE SHEETS JIKA DIPERLUKAN (UPDATE DB / AWAL KALI BUKA)
       callGasApi('getPesanan', { 
           namaPemesan: "semua", 
           role: currentUserRole,
@@ -419,6 +443,9 @@
             const cachedData = await getCache(cacheKey);
             if (!cachedData) {
                 container.innerHTML = `<div class="text-center text-rose-500 text-xs py-3">Gagal memuat data dari server.</div>`;
+            } else {
+                alert("Gagal update dari server: " + res.message);
+                filterDanRenderLokal(); // Tetap render data lokal jika server gagal
             }
         }
       });
