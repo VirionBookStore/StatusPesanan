@@ -602,6 +602,7 @@
       const itemIndex = globalPesananData.findIndex(item => item.sheetPemesan === pemesan && item.rowIndex === rowIndex);
       if (itemIndex !== -1) {
         globalPesananData[itemIndex].status = newStatus;
+        rebuildSearchIndex();
         
         const cacheKey = `data_pesanan_${currentUserRole}_${currentIdAkses}`;
         await setCache(cacheKey, globalPesananData); // Simpan status baru ke IndexedDB
