@@ -204,7 +204,7 @@
     function isRunningInApp() {
         const ua = String(navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
         // Deteksi WebView Android dan bridge native; jangan mengandalkan status internet.
-        const isAndroidWebView = /;\\s*wv\\)/i.test(ua) || /\\bwv\\b/i.test(ua);
+        const isAndroidWebView = ua.includes('; wv') || ua.includes(' wv');
         const hasNativeBridge = !!(window.AndroidInterface && typeof window.AndroidInterface.shareFile === 'function');
         const isStandaloneApp = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
         return isAndroidWebView || hasNativeBridge || !!navigator.standalone || !!isStandaloneApp;
