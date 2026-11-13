@@ -87,7 +87,7 @@
 
         <!-- TATA LETAK: 1 BARIS UNTUK PENCARIAN & ICON SYNC -->
         <div class="flex gap-2 px-1 sm:px-0 w-full mb-3">
-            <input type="text" id="searchJudul" oninput="debounceFilter()" placeholder="Ketik kata acak..." class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-700 flex-grow bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <div class="relative flex-grow min-w-0"><input type="search" id="searchJudul" oninput="debounceFilter()" placeholder="Ketik kata acak..." autocomplete="off" aria-label="Cari judul atau barcode pesanan" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 pr-20 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"><span id="searchLoadingIndicator" class="hidden absolute right-2 top-1/2 -translate-y-1/2 items-center gap-1 text-[10px] text-blue-600" role="status" aria-live="polite"><svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path></svg>Mencari</span></div>
             
             <button onclick="openScanner()" class="border border-blue-300 rounded-lg px-2 flex-shrink-0 flex items-center justify-center bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-xs font-medium" title="Scan barcode">
                 <span aria-hidden="true" class="text-sm">▥</span>
@@ -149,6 +149,7 @@
     
     let globalPesananData = []; 
     let currentFilteredData = [];
+    let indexedSearchData = [];
     let scannerStream = null;
     let scannerActive = false;
 
@@ -370,41 +371,55 @@
       loadRiwayatPesanan(false);
     }
 
-    // === FITUR ANTI-LAG (DEBOUNCE) ===
-    let debounceTimer;
-    function debounceFilter() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            filterDanRenderLokal();
-        }, 300); // Render ulang ditunda 300 milidetik setelah berhenti mengetik
+    // === PENCARIAN RESPONSIF: INDEX TEKS SEKALI, FILTER CEPAT SAAT MENGETIK ===
+    let debounceTimer = null;
+
+    function rebuildSearchIndex() {
+        indexedSearchData = (Array.isArray(globalPesananData) ? globalPesananData : []).map(item => ({
+            item,
+            judul: String(item.judul || '').toLocaleLowerCase('id-ID'),
+            barcode: String(item.barcode || '').toLocaleLowerCase('id-ID'),
+            pemesan: String(item.sheetPemesan || ''),
+            status: String(item.status || '').toUpperCase().trim()
+        }));
     }
 
-    // === FITUR PENCARIAN KATA ACAK ===
+    function setSearchLoading(show) {
+        const indicator = document.getElementById('searchLoadingIndicator');
+        if (!indicator) return;
+        indicator.classList.toggle('hidden', !show);
+        indicator.classList.toggle('flex', show);
+    }
+
+    function debounceFilter() {
+        clearTimeout(debounceTimer);
+        // Indikator muncul langsung saat pengguna mulai mengetik, bukan setelah jeda.
+        setSearchLoading(true);
+        debounceTimer = setTimeout(() => {
+            filterDanRenderLokal();
+        }, 120);
+    }
+
+    // Pencarian kata acak: setiap kata boleh muncul di posisi mana pun pada judul/barcode.
     function filterDanRenderLokal() {
         const filterNama = document.getElementById('filterPemesan').value;
-        const rawSearch = document.getElementById('searchJudul').value.toLowerCase().trim();
-        const searchKeywords = rawSearch ? rawSearch.split(/\s+/) : []; // Pecah kata berdasarkan spasi
+        const rawSearch = document.getElementById('searchJudul').value.toLocaleLowerCase('id-ID').trim();
+        const searchKeywords = rawSearch ? rawSearch.split(/\\s+/).filter(Boolean) : [];
         const filterStatus = document.getElementById('filterStatusApp').value.toUpperCase();
-        
-        currentFilteredData = globalPesananData.filter(item => {
-            const cocokPemesan = (filterNama === "semua") || (item.sheetPemesan === filterNama);
-            
-            const judulStr = (item.judul || "").toLowerCase();
-            const barcodeStr = String(item.barcode || "").toLowerCase();
-            
-            // Logika Pencarian Kata Acak (Semua kata yang diketik harus ada di judul/barcode)
-            let cocokJudul = true;
-            if (searchKeywords.length > 0) {
-                cocokJudul = searchKeywords.every(kw => judulStr.includes(kw) || barcodeStr.includes(kw));
-            }
 
-            const statusStr = (item.status || "").toUpperCase().trim();
-            const cocokStatus = (filterStatus === "SEMUA") || (statusStr === filterStatus);
-            
-            return cocokPemesan && cocokJudul && cocokStatus;
-        });
-        
+        currentFilteredData = indexedSearchData
+            .filter(entry => {
+                const cocokPemesan = filterNama === 'semua' || entry.pemesan === filterNama;
+                const cocokJudul = searchKeywords.length === 0 || searchKeywords.every(kw =>
+                    entry.judul.includes(kw) || entry.barcode.includes(kw)
+                );
+                const cocokStatus = filterStatus === 'SEMUA' || entry.status === filterStatus;
+                return cocokPemesan && cocokJudul && cocokStatus;
+            })
+            .map(entry => entry.item);
+
         renderPesanan(currentFilteredData);
+        setSearchLoading(false);
     }
 
     async function loadRiwayatPesanan(forceRefresh = false) {
@@ -418,6 +433,7 @@
         // JIKA DATA LOKAL ADA -> LANGSUNG TAMPILKAN DAN BERHENTI (TIDAK HUBUNGI SERVER)
         if (cachedData && cachedData.length > 0) {
           globalPesananData = cachedData;
+            rebuildSearchIndex();
           filterDanRenderLokal();
           return; // <--- INI KUNCINYA AGAR LOADING AWAL SANGAT CEPAT
         } else {
@@ -436,7 +452,8 @@
           id_akses: currentIdAkses
       }).then(async res => {
         if (res.status === 'success') {
-            globalPesananData = res.data; 
+            globalPesananData = res.data;
+            rebuildSearchIndex(); 
             await setCache(cacheKey, res.data); // Simpan ke IndexedDB
             filterDanRenderLokal();
         } else {
