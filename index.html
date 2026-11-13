@@ -404,7 +404,7 @@
     function filterDanRenderLokal() {
         const filterNama = document.getElementById('filterPemesan').value;
         const rawSearch = document.getElementById('searchJudul').value.toLocaleLowerCase('id-ID').trim();
-        const searchKeywords = rawSearch ? rawSearch.split(/\\s+/).filter(Boolean) : [];
+        const searchKeywords = rawSearch ? rawSearch.split(/\s+/).filter(Boolean) : [];
         const filterStatus = document.getElementById('filterStatusApp').value.toUpperCase();
 
         currentFilteredData = indexedSearchData
