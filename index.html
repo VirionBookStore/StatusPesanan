@@ -202,9 +202,12 @@
 
     // Fungsi untuk mendeteksi apakah dibuka dari dalam APK (WebView) atau Browser Web
     function isRunningInApp() {
-        const ua = navigator.userAgent || navigator.vendor || window.opera;
-        // Deteksi umum WebView Android / Custom User Agent builder APK
-        return (ua.indexOf('wv') !== -1 || /(android).*;\s[I|i]nstalled/i.test(ua) || window.AndroidInterface !== undefined || !navigator.onLine === false && ua.indexOf('Chrome/') === -1);
+        const ua = String(navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
+        // Deteksi WebView Android dan bridge native; jangan mengandalkan status internet.
+        const isAndroidWebView = /;\\s*wv\\)/i.test(ua) || /\\bwv\\b/i.test(ua);
+        const hasNativeBridge = !!(window.AndroidInterface && typeof window.AndroidInterface.shareFile === 'function');
+        const isStandaloneApp = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+        return isAndroidWebView || hasNativeBridge || !!navigator.standalone || !!isStandaloneApp;
     }
 
     // Mengatur tampilan tombol secara otomatis saat halaman dimuat
@@ -518,15 +521,15 @@
     }
 
     // 2. Fungsi Bagikan File untuk APK (Mengirim file fisik ke WhatsApp / Drive / File Manager)
-    function shareFileInApp() {
+    async function shareFileInApp() {
         if (!currentFilteredData || currentFilteredData.length === 0) {
             alert("Tidak ada data untuk dibagikan!");
             return;
         }
 
-        let isUser = currentUserRole.toLowerCase() === 'user';
-        let exportData = currentFilteredData.map((item, index) => {
-            let rowData = {
+        const isUser = currentUserRole.toLowerCase() === 'user';
+        const exportData = currentFilteredData.map((item, index) => {
+            const rowData = {
                 "No": index + 1,
                 "Nama Pemesan": item.sheetPemesan,
                 "Judul Buku": item.judul,
@@ -546,37 +549,53 @@
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Data Pesanan");
-            
             const filterValue = document.getElementById('filterPemesan').value;
             const pemesanName = filterValue === 'semua' ? 'SemuaPemesan' : filterValue;
             const dateStr = new Date().toISOString().slice(0, 10);
             const fileName = `Report_Pesanan_${pemesanName}_${dateStr}.xlsx`;
-            
-            // APK: kirim isi file XLSX ke Android melalui bridge native.
-            // WebView Android tidak selalu mendukung navigator.share({ files }) untuk Blob/File.
+            const mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
             const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            const bytes = new Uint8Array(wbout);
-            let binary = '';
-            const chunkSize = 0x8000;
-            for (let i = 0; i < bytes.length; i += chunkSize) {
-                binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
-            }
-            const base64 = btoa(binary);
+            const file = new File([wbout], fileName, { type: mimeType });
 
+            // Prioritas 1: bridge native Android membuka chooser Bagikan.
             if (window.AndroidInterface && typeof window.AndroidInterface.shareFile === 'function') {
-                window.AndroidInterface.shareFile(fileName, base64);
-            } else if (navigator.share) {
-                // Fallback untuk browser/WebView yang mendukung Web Share API.
-                const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                const file = new File([blob], fileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                navigator.share({
-                    files: [file],
-                    title: fileName,
-                    text: 'Berikut adalah file laporan pesanan.'
-                }).catch(() => {});
-            } else {
-                alert("Fitur bagikan file belum tersedia pada APK ini.");
+                const bytes = new Uint8Array(wbout);
+                let binary = '';
+                const chunkSize = 0x8000;
+                for (let i = 0; i < bytes.length; i += chunkSize) {
+                    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+                }
+                window.AndroidInterface.shareFile(fileName, btoa(binary));
+                return;
             }
+
+            // Prioritas 2: Web Share API hanya jika mendukung lampiran file.
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: fileName,
+                        text: 'Berikut adalah file laporan pesanan.'
+                    });
+                } catch (shareError) {
+                    if (shareError && shareError.name !== 'AbortError') {
+                        alert("Gagal membuka menu Bagikan: " + shareError.message);
+                    }
+                }
+                return;
+            }
+
+            // Fallback jika APK tidak memiliki bridge/share file.
+            const blob = new Blob([wbout], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            alert("APK ini belum menyediakan fitur Bagikan file. File Excel diunduh. Agar WhatsApp/Drive muncul, APK perlu bridge Android shareFile.");
         } catch(e) {
             alert("Gagal memproses file: " + e.message);
         }
